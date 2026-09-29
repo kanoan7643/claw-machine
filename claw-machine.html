@@ -65,6 +65,43 @@ body{margin:0;overflow:hidden;overscroll-behavior:none;background:radial-gradien
 .tools button:hover{border-color:var(--mint)}
 .tools button[aria-pressed="true"]{background:var(--mint);color:var(--ink);border-color:var(--mint)}
 button:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
+.easy-wrap{position:relative;margin-top:4px}
+.tools .easy{display:flex;align-items:center;gap:6px;font-size:13px;padding:8px 13px 8px 10px;border:2px solid var(--gold)}
+.easy .dot{width:14px;height:14px;border-radius:50%;border:2px solid #ff3b5c;box-sizing:border-box;position:relative;flex:none}
+.easy .dot::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#ff3b5c}
+.tools .easy[aria-pressed="true"]{background:var(--mint);border-color:var(--mint)}
+.tools .easy.nudge{animation:nudge 1.1s ease-in-out infinite}
+@keyframes nudge{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,214,107,.7)}50%{transform:scale(1.08);box-shadow:0 0 0 8px rgba(255,214,107,0),0 0 18px rgba(255,214,107,.9)}}
+.easy-tip{position:absolute;right:0;top:calc(100% + 12px);width:214px;background:var(--cream);color:var(--ink);border-radius:14px;padding:11px 12px 12px;font-size:13px;line-height:1.45;box-shadow:0 10px 26px rgba(0,0,0,.4);z-index:3;animation:rise .3s ease-out}
+.easy-tip::before{content:"";position:absolute;right:28px;top:-8px;border:8px solid transparent;border-top:0;border-bottom-color:var(--cream)}
+.easy-tip b{display:block;font-size:14px;font-weight:900;margin-bottom:2px}
+.easy-tip .acts{display:flex;gap:6px;margin-top:9px}
+.easy-tip .acts button{flex:1;font:700 13px/1 var(--body);border:0;border-radius:999px;padding:9px 0;cursor:pointer}
+.easy-tip .yes{background:var(--tangerine);color:var(--cream);box-shadow:0 3px 0 var(--tangerine-deep)}
+.easy-tip .no{background:rgba(21,24,50,.1);color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.tools .easy.nudge{animation:none;box-shadow:0 0 0 4px rgba(255,214,107,.6)}}
+
+.ach-banner{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:4;padding:16px}
+.ach-card{position:relative;text-align:center;background:linear-gradient(160deg,#2e3874,var(--ink));border:3px solid var(--gold);border-radius:24px;padding:20px 28px 22px;min-width:min(280px,100%);box-shadow:0 0 0 6px rgba(255,214,107,.2),0 0 60px rgba(255,190,60,.55),0 20px 50px rgba(0,0,0,.5);animation:achIn 3.4s cubic-bezier(.2,1.5,.4,1) forwards}
+@keyframes achIn{0%{transform:scale(.4) translateY(40px);opacity:0}10%{transform:scale(1);opacity:1}86%{transform:scale(1);opacity:1}100%{transform:scale(.9) translateY(-20px);opacity:0}}
+.ach-card small{display:block;font:400 11px/1 var(--display);letter-spacing:.24em;color:var(--gold)}
+.ach-card .medal{margin:12px auto 10px;width:92px;height:92px}
+.ach-card h2{margin:0;font-size:15px;font-weight:700;color:var(--cream-dim)}
+.ach-card strong{display:block;font-size:30px;font-weight:900;margin-top:2px;text-shadow:0 3px 0 var(--tangerine-deep)}
+.ach-card p{margin:6px 0 0;font-size:13px;color:var(--cream-dim)}
+.medal{position:relative;width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#fff4e0,#f6d9a8);border:4px solid var(--gold);box-shadow:inset 0 -4px 0 rgba(0,0,0,.12),0 3px 0 #b8860b;display:grid;place-items:center;overflow:hidden;box-sizing:border-box}
+.medal img{width:92%;height:92%;object-fit:contain}
+.medal .star{font-size:34px;line-height:1;color:#e0a100;text-shadow:0 2px 0 #fff}
+.ach-card .medal .star{font-size:50px}
+.achs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.ach{background:rgba(255,244,224,.06);border-radius:14px;padding:10px 6px;text-align:center}
+.ach .medal{margin:0 auto 6px}
+.ach b{display:block;font-size:12px}
+.ach span{display:block;font-size:11px;color:var(--cream-dim);margin-top:2px}
+.ach.locked .medal{filter:grayscale(1) brightness(.45);border-color:rgba(255,244,224,.25);box-shadow:none}
+.ach.locked b{color:var(--cream-dim)}
+.cat h3 em{font-style:normal;color:var(--cream-dim);margin-left:6px;letter-spacing:.04em}
+.cat h3 .done{color:var(--gold)}
 
 .toast{position:absolute;left:50%;top:24%;transform:translateX(-50%);background:var(--tangerine);color:var(--cream);font-weight:900;font-size:clamp(18px,5vw,26px);padding:10px 22px;border-radius:999px;box-shadow:0 6px 0 var(--tangerine-deep),0 14px 30px rgba(0,0,0,.35);white-space:nowrap;pointer-events:none;animation:pop .35s cubic-bezier(.2,1.6,.4,1)}
 .toast.soft{background:var(--panel);box-shadow:0 10px 24px rgba(0,0,0,.3)}
@@ -191,6 +228,13 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
     <button id="viewFront" type="button" aria-pressed="true">正面</button>
     <button id="viewSide" type="button" aria-pressed="false">側面</button>
     <button id="openSettings" type="button">設定</button>
+    <div class="easy-wrap">
+      <button class="easy" id="easyBtn" type="button" aria-pressed="false" title="夾子正下方顯示瞄準線"><i class="dot" aria-hidden="true"></i>簡單模式</button>
+      <div class="easy-tip" id="easyTip" role="status" hidden>
+        <b>連續 3 次沒夾到嗎？</b>打開「簡單模式」，夾子正下方會出現紅色瞄準線，更好對準！
+        <div class="acts"><button class="yes" id="easyYes" type="button">開啟</button><button class="no" id="easyNo" type="button">不用了</button></div>
+      </div>
+    </div>
   </div>
 
   <div class="backdrop" id="collectPanel" hidden>
@@ -226,7 +270,6 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
         <button class="close" type="button" data-close aria-label="關閉">✕</button>
       </div>
       <div class="sheet-body">
-        <div class="row"><label for="optLaser">瞄準引導線<small>夾子正下方顯示紅色直線</small></label><input class="switch" type="checkbox" id="optLaser"></div>
         <div class="row"><label for="optSound">音效</label><input class="switch" type="checkbox" id="optSound" checked></div>
         <div class="row"><label>補貨<small>機台內最多 24 隻娃娃</small></label><button class="pill" type="button" id="restock">補 8 隻</button></div>
       </div>
@@ -238,6 +281,9 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
   <div class="guard-banner" id="guardBanner" hidden aria-live="polite">
     <div class="rays"></div>
     <div class="gb-text"><small>GUARANTEED</small>保夾時刻！<span>這次一定夾得到</span></div>
+  </div>
+  <div class="ach-banner" id="achBanner" hidden aria-live="polite">
+    <div class="ach-card"><small>ACHIEVEMENT</small><div class="medal" id="achMedal"></div><h2>成就解鎖！</h2><strong id="achName"></strong><p id="achDesc"></p></div>
   </div>
 
   <div class="controls">
@@ -361,7 +407,8 @@ addStatic(0.4,0.05,0.4, -0.5,-0.85,0.25);            // shaft bottom
 (function buildCabinet(){
   const f1=box(1.18,0.1,1.2,std(0xffffff,.9,0,{map:checker(5.9,6)}),0.21,-0.05,0,false);
   const f2=box(0.42,0.1,0.73,std(0xffffff,.9,0,{map:checker(2.1,3.65)}),-0.59,-0.05,-0.235,false);
-  const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.8,0.47),MAT.hole); shaft.position.set(-0.59,-0.4,0.365); scene.add(shaft);
+  // inset a few mm so its walls never share a plane with the cabinet boxes around it (that z-fought and flickered as the view turned)
+  const shaft=new THREE.Mesh(new THREE.BoxGeometry(0.412,0.8,0.462),MAT.hole); shaft.position.set(-0.59,-0.402,0.365); scene.add(shaft);
   // base cabinet (split around the shaft so it stays dark inside)
   box(1.28,0.86,1.3,MAT.mint,0.26,-0.53,0);
   box(0.52,0.86,0.77,MAT.mint,-0.64,-0.53,-0.265);
@@ -693,7 +740,7 @@ const S={
   carryD0:1, liftStart:TOP_Y, collection:[], pendingMask:[],
   hubP:new THREE.Vector3(), hubQ:new THREE.Quaternion(), pP:PHI.map(()=>new THREE.Vector3()), pQ:PHI.map(()=>new THREE.Quaternion()),
 };
-S.counts={}; S.laserOn=false; S.miss=0;
+S.counts={}; S.laserOn=false; S.miss=0; S.ach=[];
 try{
   const saved=JSON.parse(localStorage.getItem('clawMachineV1')||'null');
   if(saved && Array.isArray(saved.collection)){
@@ -701,10 +748,24 @@ try{
     S.miss=clamp(saved.miss|0,0,PITY);
     if(saved.counts && typeof saved.counts==='object') S.counts=saved.counts;
     else S.collection.forEach(it=>{ S.counts[it.label]=(S.counts[it.label]||0)+1; });
+    if(Array.isArray(saved.ach)) S.ach=saved.ach.filter(a=>typeof a==='string');
   }
   S.laserOn=localStorage.getItem('clawLaser')==='1';
 }catch(e){}
-function save(){ try{ localStorage.setItem('clawMachineV1',JSON.stringify({wins:S.wins,collection:S.collection.slice(-40),counts:S.counts,miss:S.miss})); }catch(e){} }
+function save(){ try{ localStorage.setItem('clawMachineV1',JSON.stringify({wins:S.wins,collection:S.collection.slice(-40),counts:S.counts,miss:S.miss,ach:S.ach})); }catch(e){} }
+
+/* ----- achievements: collect every colour of a series ----- */
+const ACHS=TYPES.map(t=>({id:t.kind, name:t.kind+'收藏家', desc:`集滿全部 ${t.colors.length} 款${t.kind}`, type:t}))
+  .concat([{id:'all', name:'娃娃機大師', desc:`集滿全部 ${TYPES.reduce((a,t)=>a+t.colors.length,0)} 款娃娃`}]);
+const seriesDone=t=>t.colors.every(([,n])=>S.counts[n+t.kind]>0);
+function newAchievements(){
+  const out=[];
+  TYPES.forEach(t=>{ if(!S.ach.includes(t.kind) && seriesDone(t)) out.push(t.kind); });
+  if(!S.ach.includes('all') && TYPES.every(seriesDone)) out.push('all');
+  S.ach.push(...out);
+  return out.map(id=>ACHS.find(a=>a.id===id));
+}
+newAchievements(); save();   // series finished before achievements existed count too (no fanfare)
 
 const DOWN=new THREE.Vector3(0,-1,0), YAX=new THREE.Vector3(0,1,0), ZAX=new THREE.Vector3(0,0,1);
 const qYaw=PHI.map(f=>new THREE.Quaternion().setFromAxisAngle(YAX,-f));
@@ -979,7 +1040,8 @@ function endTurn(){
       showGuardBanner('下一次必中');
       fx.guardBurst=2.4; flashT=2.6;
       guardFanfare();
-    } else if(!S.msgShown) toast(S.hadGrab?'差一點點！':'沒夾到，再試一次',true);
+    } else if(S.miss===3 && !S.laserOn) showEasyNudge();   // the bubble replaces the miss toast so they don't overlap
+    else if(!S.msgShown) toast(S.hadGrab?'差一點點！':'沒夾到，再試一次',true);
   }
   setPhase('ready');
 }
@@ -1031,10 +1093,31 @@ function win(p){
   burstConfetti(wasGuard?260:140);
   S.collection.push({label:p.label,color:p.color});
   S.counts[p.label]=(S.counts[p.label]||0)+1;
+  const got=newAchievements();
   save(); renderTray(true);
   toast('抓到了！'+p.label);
   flashT=2.2;
   [523,659,784,1047].forEach((f,i)=>tone(f,.16,'square',.04,i*.09));
+  hideEasyNudge(true);
+  if(got.length){ achQueue.push(...got); if(!achBusy) setTimeout(nextAchievement,1400); achBusy=true; }
+}
+
+const achQueue=[]; let achBusy=false;
+function medalHTML(a){
+  if(!a.type) return '<span class="star">★</span>';
+  const [hex]=a.type.colors[0];
+  return `<img alt="" src="${thumbnail(a.type,hex)}">`;
+}
+function nextAchievement(){
+  const a=achQueue.shift();
+  if(!a){ achBusy=false; return; }
+  $('achMedal').innerHTML=medalHTML(a); $('achName').textContent=a.name; $('achDesc').textContent=a.desc;
+  const b=$('achBanner'); b.hidden=true; void b.offsetWidth; b.hidden=false;
+  burstConfetti(a.id==='all'?300:200); flashT=3;
+  [659,784,1047,1319].forEach((f,i)=>tone(f,.18,'square',.035,i*.11));
+  tone(1568,.6,'triangle',.035,.46); tone(1047,.6,'triangle',.03,.46);
+  renderTray(true);
+  setTimeout(()=>{ b.hidden=true; setTimeout(nextAchievement,250); },3400);
 }
 
 /* ----- fixed-step loop ----- */
@@ -1086,6 +1169,7 @@ function pressGrab(){
   if(S.phase==='ready'){
     if(S.coins<=0){ S.coins=10; toast('補充了 10 枚代幣',true); tone(988,.08,'square',.035); updateButton(); return; }
     S.coins--; S.turnWin=false; S.hadGrab=false; S.msgShown=false;
+    hideEasyNudge(false);
     setPhase('coin');
     if(guaranteed()){ showGuardBanner('這次一定夾得到'); fx.guardBurst=2; guardFanfare(); }
     tone(1400,.05,'triangle',.03); // flick
@@ -1171,9 +1255,24 @@ document.querySelectorAll('.backdrop:not(.viewer)').forEach(b=>{
 });
 $('openSettings').addEventListener('click',()=>showPanel('settingsPanel'));
 $('bagBtn').addEventListener('click',()=>{ renderCollection(); showPanel('collectPanel'); });
-const optLaser=$('optLaser'), optSound=$('optSound');
-optLaser.checked=S.laserOn;
-optLaser.addEventListener('change',()=>{ S.laserOn=optLaser.checked; try{ localStorage.setItem('clawLaser',S.laserOn?'1':'0'); }catch(e){} });
+const optSound=$('optSound');
+/* ----- 簡單模式 (aiming line) + the nudge after 3 misses in a row ----- */
+const easyBtn=$('easyBtn'), easyTip=$('easyTip');
+function setEasy(on){
+  S.laserOn=on; easyBtn.setAttribute('aria-pressed',String(on));
+  try{ localStorage.setItem('clawLaser',on?'1':'0'); }catch(e){}
+  hideEasyNudge(true);
+}
+function showEasyNudge(){ easyBtn.classList.add('nudge'); easyTip.hidden=false; tone(880,.1,'triangle',.035,.5); tone(1175,.16,'triangle',.035,.6); }
+// the bubble goes away once the next play starts; the glowing button stays until it's used or a prize is won
+function hideEasyNudge(all){ easyTip.hidden=true; if(all) easyBtn.classList.remove('nudge'); }
+setEasy(S.laserOn);
+easyBtn.addEventListener('click',e=>{
+  ensureAudio(); setEasy(!S.laserOn); e.currentTarget.blur();
+  toast(S.laserOn?'簡單模式：瞄準線已開啟':'簡單模式已關閉',true); tone(S.laserOn?988:660,.1,'square',.03);
+});
+$('easyYes').addEventListener('click',e=>{ ensureAudio(); setEasy(true); e.currentTarget.blur(); toast('簡單模式：瞄準線已開啟',true); tone(988,.1,'square',.03); });
+$('easyNo').addEventListener('click',e=>{ hideEasyNudge(true); e.currentTarget.blur(); });
 optSound.addEventListener('change',()=>{ soundOn=optSound.checked; ensureAudio(); });
 
 // 3D thumbnails for the collection, rendered once per variant with a small second renderer
@@ -1204,9 +1303,24 @@ function thumbnail(type,hex){
 function renderCollection(){
   const list=$('collectList'); list.innerHTML='';
   let kinds=0, total=0, all=0;
+  const as=document.createElement('section'), ah=document.createElement('h3'), ag=document.createElement('div');
+  ah.textContent='成就'; ag.className='achs';
+  ACHS.forEach(a=>{
+    const on=S.ach.includes(a.id), el=document.createElement('div');
+    el.className='ach'+(on?'':' locked');
+    el.innerHTML=`<div class="medal">${medalHTML(a)}</div><b></b><span class="desc"></span>`;
+    el.querySelector('b').textContent=a.name;
+    el.querySelector('.desc').textContent=on?'已達成':a.desc;
+    ag.appendChild(el);
+  });
+  as.appendChild(ah); as.appendChild(ag); list.appendChild(as);
   TYPES.forEach(type=>{
     const sec=document.createElement('section'), h=document.createElement('h3'), grid=document.createElement('div');
-    h.textContent=type.kind; grid.className='grid';
+    const have=type.colors.filter(([,n])=>S.counts[n+type.kind]>0).length, full=have===type.colors.length;
+    h.textContent=type.kind;
+    const em=document.createElement('em'); em.textContent=full?`🏆 ${have}/${have} 集滿`:`${have}/${type.colors.length}`;
+    if(full) em.className='done';
+    h.appendChild(em); grid.className='grid';
     type.colors.forEach(([hex,name])=>{
       all++;
       const label=name+type.kind, n=S.counts[label]||0;
@@ -1221,7 +1335,7 @@ function renderCollection(){
     });
     sec.appendChild(h); sec.appendChild(grid); list.appendChild(sec);
   });
-  $('collectSummary').textContent=`已收集 ${kinds} / ${all} 種 · 共 ${total} 個`;
+  $('collectSummary').textContent=`已收集 ${kinds} / ${all} 種 · 共 ${total} 個 · 成就 ${S.ach.length} / ${ACHS.length}`;
 }
 
 /* ----- big 3D viewer for a collected prize ----- */
