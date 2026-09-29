@@ -51,7 +51,14 @@ body{margin:0;overflow:hidden;overscroll-behavior:none;background:radial-gradien
 .stat.guard.on b{color:var(--ink)}
 @keyframes guardGlow{50%{box-shadow:0 0 0 4px rgba(255,207,74,.35),0 0 22px rgba(255,160,60,.8)}}
 @media (prefers-reduced-motion:reduce){.stat.guard.on{animation:none}}
-@media (max-width:420px){.stat{min-width:44px;padding:6px 7px 7px}.stat b{font-size:17px}}
+@media (max-width:420px){
+  .hud{flex-wrap:nowrap}
+  .stats{gap:4px;flex:none}
+  .stat{min-width:0;width:44px;padding:5px 2px 6px;border-radius:10px}
+  .stat label{font-size:9px;letter-spacing:.04em}
+  .stat b{font-size:16px}
+  .stat.guard b{font-size:13px;line-height:1.35}
+}
 
 .tools{position:absolute;right:16px;top:calc(env(safe-area-inset-top,0px) + 70px);display:flex;flex-direction:column;gap:6px;align-items:flex-end}
 .tools button{font:700 12px/1 var(--body);color:var(--cream);background:var(--panel);border:1px solid rgba(255,244,224,.18);border-radius:999px;padding:7px 12px;cursor:pointer}
