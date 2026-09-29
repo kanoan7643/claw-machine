@@ -326,7 +326,7 @@ world.allowSleep = true;
 world.solver.iterations = 14;
 world.defaultContactMaterial.friction = 0.5;
 world.defaultContactMaterial.restitution = 0.06;
-world.defaultContactMaterial.contactEquationStiffness = 1e7;
+world.defaultContactMaterial.contactEquationStiffness = 5e6;
 world.defaultContactMaterial.contactEquationRelaxation = 3;
 const staticMat=new CANNON.Material('static'), plushMat=new CANNON.Material('plush'), eggMat=new CANNON.Material('egg'), clawMat=new CANNON.Material('claw');
 [[eggMat,staticMat,.22],[eggMat,plushMat,.3],[eggMat,eggMat,.18],[eggMat,clawMat,.25],[plushMat,clawMat,.75]].forEach(([a,b,f])=>{
@@ -353,9 +353,10 @@ addStatic(1.0,1.6,0.15, 0,0.7,-0.725); addStatic(1.0,1.6,0.15, 0,0.7,0.725);
 addStatic(1.0,0.1,0.8, 0,2.05,0);                    // ceiling above the gantry
 addStatic(0.012,0.11,0.235, -0.37,0.11,0.365);       // chute barrier (acrylic)
 addStatic(0.22,0.11,0.012, -0.59,0.11,0.12);
-addStatic(0.01,0.4,0.235, -0.37,-0.4,0.365);         // shaft walls
-addStatic(0.22,0.4,0.01, -0.59,-0.4,0.12);
-addStatic(0.3,0.05,0.3, -0.59,-0.85,0.36);           // shaft bottom
+// shaft below the hole flares out under the floor so a big prize lying crosswise can't wedge in it
+addStatic(0.01,0.35,0.34, -0.22,-0.45,0.28);         // shaft walls (top at y=-0.1, hidden under the floor)
+addStatic(0.34,0.35,0.01, -0.5,-0.45,-0.07);
+addStatic(0.4,0.05,0.4, -0.5,-0.85,0.25);            // shaft bottom
 
 (function buildCabinet(){
   const f1=box(1.18,0.1,1.2,std(0xffffff,.9,0,{map:checker(5.9,6)}),0.21,-0.05,0,false);
@@ -739,7 +740,16 @@ function driveKin(k,pos,quat){
   k.pp.copy(pos); k.pq.copy(quat);
 }
 function snapKin(){ hubKin.pp.copy(S.hubP); hubKin.pq.copy(S.hubQ); prongKin.forEach((k,i)=>{k.pp.copy(S.pP[i]); k.pq.copy(S.pQ[i]);}); driveAll(); }
-function driveAll(){ driveKin(hubKin,S.hubP,S.hubQ); prongKin.forEach((k,i)=>driveKin(k,S.pP[i],S.pQ[i])); }
+const _hp=new THREE.Vector3(), _hq=new THREE.Quaternion();
+function driveAll(){
+  driveKin(hubKin,S.hubP,S.hubQ); prongKin.forEach((k,i)=>driveKin(k,S.pP[i],S.pQ[i]));
+  const g=S.grab;
+  if(g){ // held prize rides rigidly with the claw head
+    _hp.copy(g.rel).applyQuaternion(S.hubQ).add(S.hubP);
+    _hq.copy(S.hubQ).multiply(g.relQ);
+    driveKin(g.kin,_hp,_hq);
+  }
+}
 
 function setPhase(p){ S.phase=p; S.pt=0; updateButton(); }
 function wakeNear(){ for(const p of prizes){ const b=p.body; if(Math.hypot(b.position.x-S.hubP.x,b.position.z-S.hubP.z)<0.45) b.wakeUp(); } }
@@ -763,10 +773,17 @@ function stepGame(h){
     const m=moveVector(); tvx=m.x*MOVE_SPEED; tvz=m.z*MOVE_SPEED;
     if(S.timeLeft<=0){ S.timeLeft=0; startDrop(); }
   } else if(P==='carry'){
-    const dx=HOME.x-S.gx, dz=HOME.z-S.gz, d=Math.hypot(dx,dz);
+    // aim the *prize* (not the claw) at the middle of the chute, since it may hang off to one side
+    const tg=carryTarget(), dx=tg.x-S.gx, dz=tg.z-S.gz, d=Math.hypot(dx,dz);
     if(d>0.004){ const sp=Math.min(CARRY_SPEED,d*3); tvx=dx/d*sp; tvz=dz/d*sp; }
-    else if(Math.hypot(S.gvx,S.gvz)<0.03 && S.pt>0.2){ beginRelease(); }
+    else {
+      S.settle=(S.settle||0)+h;
+      // only open once the swing has died down, so the prize drops straight in instead of being flung
+      const calm=Math.hypot(S.ox,S.oz)<0.012 && Math.hypot(S.ovx,S.ovz)<0.06;
+      if(Math.hypot(S.gvx,S.gvz)<0.03 && S.pt>0.2 && (calm || S.settle>2.5)){ S.settle=0; beginRelease(); }
+    }
     const g=S.grab;
+    if(g && g.prize.body.collisionFilterMask===G_STATIC && !overlapsOthers(g.prize)) g.prize.body.collisionFilterMask=G_STATIC|G_PRIZE;
     if(g && g.fate && g.fate.stage==='carry' && 1-d/S.carryD0>=g.fate.at) dropGrab(true);
   }
   // gantry with limited acceleration; the claw hangs as a pendulum and reacts to it
@@ -796,15 +813,18 @@ function stepGame(h){
       wakeNear();
       let all=true;
       for(let i=0;i<3;i++){ if(S.stopped[i]) continue; all=false; S.theta[i]-=0.95*h; if(S.theta[i]<=CLOSED){S.theta[i]=CLOSED; S.stopped[i]=true;} }
-      if(all || S.pt>1.2){ evaluateGrab(); setPhase('hold'); }
+      if(all || S.pt>1.2){ setPhase('hold'); }
       break; }
     case 'hold':
-      if(S.pt>0.35){ S.liftStart=S.hy; setPhase('lift'); tone(330,.5,'triangle',.03,0,660); } break;
+      // let the squeezed pile relax inside the closed prongs first, then decide what the claw is holding
+      if(S.pt>0.35){ wakeNear(); evaluateGrab(); S.liftStart=S.hy; setPhase('lift'); tone(330,.5,'triangle',.03,0,660); } break;
     case 'lift': {
       S.hy=Math.min(TOP_Y,S.hy+0.5*h);
       const g=S.grab;
+      if(g && g.prize.body.collisionFilterMask===G_STATIC && S.hy-S.liftStart>0.2 && !overlapsOthers(g.prize))
+        g.prize.body.collisionFilterMask=G_STATIC|G_PRIZE;
       if(g && g.fate && g.fate.stage==='lift' && (S.hy-S.liftStart)/Math.max(.01,TOP_Y-S.liftStart)>=g.fate.at) dropGrab(true);
-      if(S.hy>=TOP_Y && S.pt>0.3){ S.carryD0=Math.max(0.02,Math.hypot(HOME.x-S.gx,HOME.z-S.gz)); setPhase('carry'); }
+      if(S.hy>=TOP_Y && S.pt>0.3){ const tg=carryTarget(); S.carryD0=Math.max(0.02,Math.hypot(tg.x-S.gx,tg.z-S.gz)); S.settle=0; setPhase('carry'); }
       break; }
     case 'release':
       for(let i=0;i<3;i++) S.theta[i]=approach(S.theta[i],OPEN,2.2*h);
@@ -816,14 +836,17 @@ function stepGame(h){
 
   // pendulum (small-angle), driven by gantry acceleration
   const L=Math.max(0.15,GANTRY_Y-S.hy), w2=9.82/L;
-  const damp=(P==='settle'||P==='close'||P==='hold')?7:2*0.05*Math.sqrt(w2);
+  const damp=(P==='settle'||P==='close'||P==='hold')?7:(P==='carry'&&S.settle>0)?4:2*0.05*Math.sqrt(w2);
   S.ovx+=(-w2*S.ox-damp*S.ovx-ax)*h; S.ovz+=(-w2*S.oz-damp*S.ovz-az)*h;
   S.ox+=S.ovx*h; S.oz+=S.ovz*h;
   const lim=0.3*L; S.ox=clamp(S.ox,-lim,lim); S.oz=clamp(S.oz,-lim,lim);
   if(S.grab){ // a carried prize bumps the glass: stop the swing there instead of pushing through
-    const r=S.grab.reach, mx=Math.max(0,0.775-r), mz=Math.max(0,0.575-r);
+    // limits depend on which side the prize hangs, so a prize on the far side doesn't hold the claw back
+    const b=S.grab.prize.body.position, e=S.grab.ext, ofx=b.x-S.hubP.x, ofz=b.z-S.hubP.z;
+    const lim2=(v,lo,hi)=>lo>hi?(lo+hi)/2:clamp(v,lo,hi);
+    const hx=S.gx+S.ox, hz=S.gz+S.oz;
     const step=0.6*h;   // ease back in rather than snapping, so the held prize isn't yanked
-    const ex=S.gx+S.ox-clamp(S.gx+S.ox,-mx,mx), ez=S.gz+S.oz-clamp(S.gz+S.oz,-mz,mz);
+    const ex=hx-lim2(hx,-0.775-ofx+e,0.775-ofx-e), ez=hz-lim2(hz,-0.575-ofz+e,0.575-ofz-e);
     if(ex){ S.ox-=clamp(ex,-step,step); if(S.ovx*ex>0) S.ovx*=-0.2; }
     if(ez){ S.oz-=clamp(ez,-step,step); if(S.ovz*ez>0) S.ovz*=-0.2; }
   }
@@ -894,24 +917,32 @@ function evaluateGrab(){
   const below=clamp(0.5+(b.y-tipY)/0.07,0.35,1);
   const nF=enclosed?0.95:(bc>=3?1:0.82);
   const q=centered*below*nF*best.grip;
-  const pSuccess=clamp(0.28+0.85*q,0.25,0.94);
+  const pSuccess=clamp(0.1+0.68*q,0.1,0.8);
   const fate = (guard || Math.random()<pSuccess) ? null :
     (Math.random()<(q<0.35?0.7:0.4) ? {stage:'lift',at:0.15+Math.random()*0.75} : {stage:'carry',at:0.1+Math.random()*0.75});
-  const lock=new CANNON.LockConstraint(hubKin.body,best.body,{maxForce:guard?400:60});
-  world.addConstraint(lock);
-  best.body.collisionFilterMask=G_STATIC|G_PRIZE;
-  best.body.wakeUp();
+  // The claw holds the prize rigidly in whatever pose it was caught: the prize becomes kinematic and
+  // rides along with the claw head. (cannon 0.6.2's LockConstraint assumes both bodies start aligned and
+  // twists a tilted prize violently toward the claw's orientation, flinging it out.)
+  const bq=best.body.quaternion;
   const rel=new THREE.Vector3(b.x,b.y,b.z).sub(S.hubP).applyQuaternion(_qi.copy(S.hubQ).invert());
-  // how far the held prize reaches sideways from the claw axis (its offset plus its furthest part)
+  const relQ=_qi.clone().multiply(new THREE.Quaternion(bq.x,bq.y,bq.z,bq.w));   // hubQ⁻¹ · prizeQ
+  best.body.type=CANNON.Body.KINEMATIC; best.body.allowSleep=false;
+  best.body.velocity.set(0,0,0); best.body.angularVelocity.set(0,0,0);
+  // while it's pulled out of the pile it slides past neighbours dragged up by the prongs; once clear
+  // (see lift/carry) it pushes other prizes again
+  best.body.collisionFilterMask=G_STATIC;
+  best.body.wakeUp();
+  const kin={body:best.body, pp:new THREE.Vector3(b.x,b.y,b.z), pq:new THREE.Quaternion(bq.x,bq.y,bq.z,bq.w)};
+  // how far the held prize's furthest part reaches from its own centre
   let ext=0; best.body.shapes.forEach((sh,i)=>{ ext=Math.max(ext,best.body.shapeOffsets[i].length()+sh.radius); });
-  const reach=Math.hypot(rel.x,rel.z)+ext+0.01;
-  S.grab={prize:best, lock, rel, fate, guard, reach};
+  S.grab={prize:best, kin, rel, relQ, fate, guard, ext:ext+0.005};
   S.hadGrab=true;
   tone(240,.1,'square',.035); tone(300,.12,'square',.03,.08);
 }
 function freeGrab(delay){
   const g=S.grab; if(!g) return;
-  world.removeConstraint(g.lock);
+  // hand the prize back to physics; it keeps the claw's current motion, so it simply falls
+  g.prize.body.type=CANNON.Body.DYNAMIC; g.prize.body.allowSleep=true;
   g.prize.body.wakeUp();
   S.pendingMask.push({p:g.prize,t:delay});
   S.grab=null;
@@ -922,6 +953,23 @@ function dropGrab(announce){
   if(announce && !S.msgShown){ S.msgShown=true; toast('滑掉了…',true); tone(420,.35,'triangle',.04,0,140); }
 }
 function releaseGrab(){ freeGrab(0.6); }
+function overlapsOthers(p){
+  const mine=spheresOf(p);
+  for(const q of prizes){
+    if(q===p) continue;
+    const b=q.body.position; if(Math.abs(b.y-p.body.position.y)>0.6) continue;
+    for(const s of spheresOf(q)) for(const m of mine)
+      if(Math.hypot(s.x-m.x,s.y-m.y,s.z-m.z)<s.r+m.r) return true;
+  }
+  return false;
+}
+const CHUTE={x:-0.575, z:0.36};
+function carryTarget(){
+  const g=S.grab;
+  if(!g) return HOME;
+  const b=g.prize.body.position;
+  return { x:clamp(CHUTE.x-(b.x-S.hubP.x),-BX,BX), z:clamp(CHUTE.z-(b.z-S.hubP.z),-BZ,BZ) };
+}
 function beginRelease(){ setPhase('release'); tone(700,.08,'square',.03); }
 function endTurn(){
   if(!S.turnWin){
@@ -951,11 +999,6 @@ function postStep(h){
   const P=S.phase;
   if(P==='descend' && descendBlocked()) beginClose();
   else if(P==='close') closeContacts();
-  if(S.grab){
-    const b=S.grab.prize.body.position;
-    _v.copy(S.grab.rel).applyQuaternion(S.hubQ).add(S.hubP);
-    if(!S.grab.guard && Math.hypot(b.x-_v.x,b.y-_v.y,b.z-_v.z)>0.1) dropGrab(true);
-  }
   for(let i=S.pendingMask.length-1;i>=0;i--){
     const m=S.pendingMask[i]; m.t-=h;
     if(m.t<=0){ m.p.body.collisionFilterMask=MASK_FULL; S.pendingMask.splice(i,1); }
@@ -969,7 +1012,9 @@ function postStep(h){
       if(b.x>LX){ b.x=LX; if(v.x>0) v.x=0; } else if(b.x<-LX){ b.x=-LX; if(v.x<0) v.x=0; }
       if(b.z>LZ){ b.z=LZ; if(v.z>0) v.z=0; } else if(b.z<-LZ){ b.z=-LZ; if(v.z<0) v.z=0; }
     }
-    if(y<-0.3){
+    // won as soon as it has dropped below the floor inside the prize hole (or fallen deep anywhere)
+    const pb=p.body.position, inHole=pb.x<-0.36 && pb.z>0.11 && y<-0.04;
+    if(y<-0.3 || inHole){
       if(S.phase!=='ready' || S.pt<2.5) win(p);
       else { // settled into the chute with no play in progress: put it back on the pile
         p.body.position.set(0.25,0.9,0); p.body.velocity.set(0,0,0); p.body.angularVelocity.set(0,0,0); p.body.wakeUp();
