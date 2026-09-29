@@ -14,6 +14,7 @@
   --tangerine:#ff7a3d;
   --tangerine-deep:#c94c17;
   --mint:#5fd6c0;
+  --gold:#ffd66b;
   --ink:#151832;
   --display:"Bungee","Noto Sans TC",system-ui,sans-serif;
   --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
@@ -55,6 +56,17 @@ button:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
 
 .toast{position:absolute;left:50%;top:24%;transform:translateX(-50%);background:var(--tangerine);color:var(--cream);font-weight:900;font-size:clamp(18px,5vw,26px);padding:10px 22px;border-radius:999px;box-shadow:0 6px 0 var(--tangerine-deep),0 14px 30px rgba(0,0,0,.35);white-space:nowrap;pointer-events:none;animation:pop .35s cubic-bezier(.2,1.6,.4,1)}
 .toast.soft{background:var(--panel);box-shadow:0 10px 24px rgba(0,0,0,.3)}
+.guard-vignette{position:absolute;inset:0;pointer-events:none;z-index:1;box-shadow:inset 0 0 60px 12px rgba(255,190,60,.5),inset 0 0 0 4px var(--gold);animation:vig 1.1s ease-in-out infinite}
+@keyframes vig{50%{box-shadow:inset 0 0 120px 30px rgba(255,110,60,.55),inset 0 0 0 7px #fff1b0}}
+.guard-banner{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:4;overflow:hidden}
+.guard-banner .rays{position:absolute;left:50%;top:50%;width:170vmax;height:170vmax;margin:-85vmax 0 0 -85vmax;border-radius:50%;background:repeating-conic-gradient(rgba(255,214,107,.3) 0 9deg,transparent 9deg 18deg);-webkit-mask:radial-gradient(circle,#000 8%,transparent 55%);mask:radial-gradient(circle,#000 8%,transparent 55%);animation:spin 7s linear infinite,fadeRays 2.8s ease-out forwards}
+.gb-text{position:relative;text-align:center;font-weight:900;font-size:clamp(46px,13vw,104px);line-height:1;color:var(--cream);text-shadow:0 6px 0 var(--tangerine-deep),0 0 34px rgba(255,200,80,.95),0 0 80px rgba(255,120,60,.7);animation:slam 2.8s cubic-bezier(.2,1.5,.4,1) forwards}
+.gb-text small{display:block;font:400 .2em/1 var(--display);letter-spacing:.24em;color:var(--gold);margin-bottom:.3em;text-shadow:0 2px 0 var(--ink)}
+.gb-text span{display:block;font-size:.26em;margin-top:.4em;color:var(--cream);text-shadow:0 2px 0 var(--ink),0 0 18px rgba(255,160,60,.9)}
+@keyframes slam{0%{transform:scale(2.6) rotate(-6deg);opacity:0}12%{transform:scale(1) rotate(0);opacity:1}20%{transform:scale(1.08)}28%{transform:scale(1)}82%{transform:scale(1);opacity:1}100%{transform:scale(.85);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeRays{0%{opacity:0}15%{opacity:1}80%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.guard-vignette{animation:none}.guard-banner .rays{animation:fadeRays 2.8s ease-out forwards}}
 @keyframes pop{from{transform:translateX(-50%) scale(.6);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
 
 .controls{position:absolute;left:20px;right:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:flex;justify-content:space-between;align-items:flex-end;gap:12px;pointer-events:none}
@@ -210,6 +222,11 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
   </div>
 
   <div class="toast" id="toast" hidden></div>
+  <div class="guard-vignette" id="guardVignette" hidden></div>
+  <div class="guard-banner" id="guardBanner" hidden aria-live="polite">
+    <div class="rays"></div>
+    <div class="gb-text"><small>GUARANTEED</small>保夾時刻！<span>這次一定夾得到</span></div>
+  </div>
 
   <div class="controls">
     <div class="stick" id="stick" aria-label="移動搖桿"><div class="knob" id="knob"></div></div>
@@ -276,6 +293,7 @@ const MAT = {
   ink: std(0x1a1d3a,.8), hole: std(0x0d0f22,1,0,{side:THREE.BackSide}), chrome: std(0xe6e9f2,.28,.55),
   cable: std(0x2b2f45,.6), glass: new THREE.MeshStandardMaterial({color:lin(0xd9f3ff), transparent:true, opacity:.09, roughness:.05, depthWrite:false, side:THREE.DoubleSide}),
   acrylic: new THREE.MeshStandardMaterial({color:lin(0xbfeaff), transparent:true, opacity:.28, roughness:.1, depthWrite:false}),
+  post: std(0xfff4e0,.55,0,{emissive:lin(0xffc63a),emissiveIntensity:0}),
   claw: std(0xe6e9f2,.28,.55,{emissive:lin(0xffb52e),emissiveIntensity:0}),
   coinLight: std(0xff7a3d,.45,0,{emissive:lin(0xff9a4d),emissiveIntensity:0}),
   gold: std(0xf2c14e,.3,.6,{emissive:lin(0x6b4a00),emissiveIntensity:.35}),
@@ -351,7 +369,7 @@ addStatic(0.3,0.05,0.3, -0.59,-0.85,0.36);           // shaft bottom
   const a2=new THREE.Mesh(new THREE.BoxGeometry(0.44,0.22,0.024),MAT.acrylic); a2.position.set(-0.59,0.11,0.12); scene.add(a2);
   box(0.03,0.02,0.49,MAT.tangerine,-0.37,0.225,0.365,false); box(0.45,0.02,0.03,MAT.tangerine,-0.59,0.225,0.12,false);
   // posts and frame
-  [[-0.84,-0.62],[0.84,-0.62],[-0.84,0.62],[0.84,0.62]].forEach(([x,z])=>box(0.08,2.06,0.08,MAT.cream,x,1.0,z));
+  [[-0.84,-0.62],[0.84,-0.62],[-0.84,0.62],[0.84,0.62]].forEach(([x,z])=>box(0.08,2.06,0.08,MAT.post,x,1.0,z));
   box(1.76,0.05,0.06,MAT.cream,0,0.02,0.62,false);
   // header
   box(1.84,0.42,1.34,MAT.tangerine,0,2.2,0);
@@ -375,12 +393,27 @@ function drawSign(){
   x.font='70px "Bungee",sans-serif'; x.lineWidth=12; x.strokeText('CLAW',810,112); x.fillStyle='#5fd6c0'; x.fillText('CLAW',810,108);
   x.font='30px "Bungee",sans-serif'; x.fillStyle='#151832'; x.fillText('1 COIN · 1 PLAY',810,178);
   signTex.needsUpdate=true;
+  // 保夾 version of the sign: gold burst with the promise spelled out
+  const d=signGuardTex.image.getContext('2d');
+  const gg=d.createLinearGradient(0,0,1024,256); gg.addColorStop(0,'#ffcf4a'); gg.addColorStop(.5,'#fff1b0'); gg.addColorStop(1,'#ff9a3c');
+  d.fillStyle=gg; d.fillRect(0,0,1024,256);
+  d.save(); d.translate(512,128); d.fillStyle='rgba(255,122,61,.28)';
+  for(let k=0;k<24;k++){ d.rotate(Math.PI/12); d.beginPath(); d.moveTo(0,0); d.lineTo(700,-40); d.lineTo(700,40); d.closePath(); d.fill(); }
+  d.restore();
+  d.lineJoin='round'; d.textAlign='center'; d.textBaseline='middle';
+  d.font='900 150px "Noto Sans TC","Microsoft JhengHei",sans-serif';
+  d.lineWidth=20; d.strokeStyle='#151832'; d.strokeText('保夾中',380,136);
+  d.fillStyle='#ff5a2a'; d.fillText('保夾中',380,130);
+  d.font='64px "Bungee",sans-serif'; d.lineWidth=12; d.strokeText('必中!',820,106); d.fillStyle='#fff4e0'; d.fillText('必中!',820,102);
+  d.font='30px "Bungee",sans-serif'; d.fillStyle='#151832'; d.fillText('GUARANTEED',820,178);
+  signGuardTex.needsUpdate=true;
 }
+const signGuardTex = canvasTex(1024,256,()=>{});
 drawSign(); if(document.fonts && document.fonts.ready) document.fonts.ready.then(drawSign);
 const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.36),new THREE.MeshBasicMaterial({map:signTex})); sign.position.set(0,2.2,0.672); scene.add(sign);
-const bulbMats=[std(0xfff4e0,.4,0,{emissive:lin(0xffc46b),emissiveIntensity:1}),std(0xfff4e0,.4,0,{emissive:lin(0xffc46b),emissiveIntensity:.1})];
+const BULB_WARM=lin(0xffc46b), bulbs=[];
 const bulbGeo=new THREE.SphereGeometry(0.018,10,8);
-for(let i=0;i<17;i++){ [1.985,2.425].forEach((y,j)=>{ const b=new THREE.Mesh(bulbGeo,bulbMats[(i+j)%2]); b.position.set(-0.84+i*0.105,y,0.685); scene.add(b); }); }
+for(let i=0;i<17;i++){ [1.985,2.425].forEach((y,j)=>{ const m=std(0xfff4e0,.4,0,{emissive:BULB_WARM.clone(),emissiveIntensity:1}); const b=new THREE.Mesh(bulbGeo,m); b.position.set(-0.84+i*0.105,y,0.685); scene.add(b); bulbs.push({m,i,j}); }); }
 
 /* ================= prizes ================= */
 const geoCache={}, matCache={};
@@ -569,10 +602,46 @@ function burstConfetti(n){
   }
   confGeo.attributes.color.needsUpdate=true;
 }
+// 保夾 stage show: sweeping spotlight beams, rising gold stars, colour-cycling cabinet light
+const beamGeo=new THREE.ConeGeometry(0.3,1.95,28,1,true); beamGeo.translate(0,-0.975,0);  // apex at the top
+const beams=[[-0.5,0xffd66b],[0,0xff7ab8],[0.5,0x6fe3ff]].map(([x,c],i)=>{
+  const m=new THREE.Mesh(beamGeo,new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  m.position.set(x,1.97,0.05); m.visible=false; m.userData.i=i; scene.add(m); return m;
+});
+const STAR_N=110;
+const starGeo=new THREE.BufferGeometry(); starGeo.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(STAR_N*3),3));
+const starMat=new THREE.PointsMaterial({color:0xffe08a,size:.06,map:dotTex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
+const stars=new THREE.Points(starGeo,starMat); stars.frustumCulled=false; stars.visible=false; scene.add(stars);
+const starSeed=Array.from({length:STAR_N},()=>({x:-0.75+Math.random()*1.5, z:-0.55+Math.random()*1.1, h:Math.random(), s:.15+Math.random()*.35, w:Math.random()*6}));
+const WARM_COL=warm.color.clone();
+
 function updateEffects(dt){
   const g=guaranteed();
   fx.guardBurst=Math.max(0,fx.guardBurst-dt);
-  MAT.claw.emissiveIntensity=g?0.45+0.3*Math.sin(clock*6):0;
+  MAT.claw.emissiveIntensity=g?0.7+0.5*Math.sin(clock*6):0;
+  MAT.post.emissiveIntensity=g?0.9+0.6*Math.sin(clock*5):0;
+  if(g) MAT.post.emissive.setHSL((clock*0.25)%1,1,0.5);
+  // cabinet light pulses through the rainbow
+  if(g){ warm.color.setHSL((clock*0.2)%1,0.9,0.62); warm.intensity=1.1+0.5*Math.sin(clock*4); }
+  else { warm.color.copy(WARM_COL); warm.intensity=0.55; }
+  for(const b of beams){
+    b.visible=g;
+    if(!g) continue;
+    const i=b.userData.i;
+    b.rotation.z=Math.sin(clock*1.5+i*2.1)*0.42;
+    b.rotation.x=Math.cos(clock*1.2+i*1.3)*0.22;
+    b.material.opacity=0.06+0.035*Math.sin(clock*5+i)+(fx.guardBurst>0?0.08:0);
+  }
+  stars.visible=g;
+  if(g){
+    const p=starGeo.attributes.position.array;
+    starSeed.forEach((s,i)=>{
+      const y=((s.h+clock*s.s)%1);
+      p[i*3]=s.x+Math.sin(clock*2+s.w)*0.03; p[i*3+1]=0.05+y*1.9; p[i*3+2]=s.z;
+    });
+    starGeo.attributes.position.needsUpdate=true;
+    starMat.opacity=0.55+0.35*Math.sin(clock*7);
+  }
   sparks.visible=g||fx.guardBurst>0;
   if(sparks.visible){
     const p=sparkGeo.attributes.position.array, burst=fx.guardBurst>0?1+fx.guardBurst*1.5:1;
@@ -833,14 +902,24 @@ function endTurn(){
     const was=guaranteed();
     S.miss=Math.min(PITY,S.miss+1); save();
     if(!was && guaranteed()){
-      toast('保夾啟動！下一次必中');
-      fx.guardBurst=1.6; flashT=2.2;
-      [392,523,659,784,1047,1319].forEach((f,i)=>tone(f,.14,'square',.035,i*.07));
+      showGuardBanner('下一次必中');
+      fx.guardBurst=2.4; flashT=2.6;
+      guardFanfare();
     } else if(!S.msgShown) toast(S.hadGrab?'差一點點！':'沒夾到，再試一次',true);
   }
   setPhase('ready');
 }
 function guaranteed(){ return S.miss>=PITY; }
+let bannerTimer=0;
+function showGuardBanner(sub){
+  const b=$('guardBanner'); b.querySelector('.gb-text span').textContent=sub;
+  b.hidden=true; void b.offsetWidth; b.hidden=false;
+  clearTimeout(bannerTimer); bannerTimer=setTimeout(()=>{ b.hidden=true; },2800);
+}
+function guardFanfare(){
+  [392,523,659,784,1047,1319].forEach((f,i)=>tone(f,.14,'square',.035,i*.07));
+  tone(1568,.5,'square',.035,.46); tone(1047,.5,'triangle',.03,.46); tone(784,.5,'triangle',.03,.46);
+}
 
 function postStep(h){
   const P=S.phase;
@@ -920,6 +999,7 @@ function updateHUD(){
   const key=S.coins+'|'+S.wins+'|'+t+'|'+gt;
   if(key===hudCache) return; hudCache=key;
   $('guard').textContent=gt; $('guardBox').classList.toggle('on',g);
+  $('guardVignette').hidden=!g;
   $('coins').textContent=S.coins; $('wins').textContent=S.wins; $('timer').textContent=t;
   $('timerBox').classList.toggle('low',S.phase==='move'&&S.timeLeft<=5);
 }
@@ -930,7 +1010,7 @@ function pressGrab(){
     if(S.coins<=0){ S.coins=10; toast('補充了 10 枚代幣',true); tone(988,.08,'square',.035); updateButton(); return; }
     S.coins--; S.turnWin=false; S.hadGrab=false; S.msgShown=false;
     setPhase('coin');
-    if(guaranteed()) toast('保夾中！這次一定夾得起來');
+    if(guaranteed()){ showGuardBanner('這次一定夾得到'); fx.guardBurst=2; guardFanfare(); }
     tone(1400,.05,'triangle',.03); // flick
     // clink as the coin reaches the slot, then the coin rattles down inside
     tone(1760,.09,'square',.035,COIN_HIT); tone(2349,.18,'square',.03,COIN_HIT+.06);
@@ -1221,8 +1301,16 @@ function syncVisuals(dt){
   // marquee bulbs
   flashT=Math.max(0,flashT-dt);
   updateEffects(dt);
-  const rate=flashT>0?10:(guaranteed()?5:1.6), on=Math.floor(clock*rate)%2;
-  bulbMats[0].emissiveIntensity=on?1.1:0.12; bulbMats[1].emissiveIntensity=on?0.12:1.1;
+  const g=guaranteed(), rate=flashT>0?10:1.6, on=Math.floor(clock*rate)%2;
+  for(const b of bulbs){
+    if(g){ // rainbow chase running around the marquee
+      const k=b.j?b.i:16-b.i+17, h=((k*0.045-clock*0.9)%1+1)%1;
+      b.m.emissive.setHSL(h,1,0.55); b.m.emissiveIntensity=flashT>0&&on?2.2:1.5;
+    } else {
+      b.m.emissive.copy(BULB_WARM); b.m.emissiveIntensity=(((b.i+b.j)%2===0)===!!on)?1.1:0.12;
+    }
+  }
+  sign.material.map=(g && (clock%1.6)<1.2)?signGuardTex:signTex;
 }
 
 let last=performance.now(), acc=0;
