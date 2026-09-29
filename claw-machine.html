@@ -326,7 +326,7 @@ world.allowSleep = true;
 world.solver.iterations = 14;
 world.defaultContactMaterial.friction = 0.5;
 world.defaultContactMaterial.restitution = 0.06;
-world.defaultContactMaterial.contactEquationStiffness = 5e6;
+world.defaultContactMaterial.contactEquationStiffness = 1e7;
 world.defaultContactMaterial.contactEquationRelaxation = 3;
 const staticMat=new CANNON.Material('static'), plushMat=new CANNON.Material('plush'), eggMat=new CANNON.Material('egg'), clawMat=new CANNON.Material('claw');
 [[eggMat,staticMat,.22],[eggMat,plushMat,.3],[eggMat,eggMat,.18],[eggMat,clawMat,.25],[plushMat,clawMat,.75]].forEach(([a,b,f])=>{
@@ -346,8 +346,11 @@ function addStatic(hx,hy,hz,x,y,z){
 // interior: x[-0.8,0.8] z[-0.6,0.6], floor y=0; chute hole front-left x[-0.8,-0.38] z[0.13,0.6]
 addStatic(0.59,0.05,0.6, 0.21,-0.05,0);              // main floor
 addStatic(0.21,0.05,0.365, -0.59,-0.05,-0.235);      // back-left floor
-addStatic(0.05,1.6,0.7, -0.85,0.7,0); addStatic(0.05,1.6,0.7, 0.85,0.7,0);
-addStatic(0.9,1.6,0.05, 0,0.7,-0.65); addStatic(0.9,1.6,0.05, 0,0.7,0.65);
+// walls: inner faces sit 2.5cm inside the glass (x ±0.8, z ±0.6) so soft contacts never show through;
+// thick boxes so a hard shove can't tunnel a prize through
+addStatic(0.15,1.6,0.8, -0.925,0.7,0); addStatic(0.15,1.6,0.8, 0.925,0.7,0);
+addStatic(1.0,1.6,0.15, 0,0.7,-0.725); addStatic(1.0,1.6,0.15, 0,0.7,0.725);
+addStatic(1.0,0.1,0.8, 0,2.05,0);                    // ceiling above the gantry
 addStatic(0.012,0.11,0.235, -0.37,0.11,0.365);       // chute barrier (acrylic)
 addStatic(0.22,0.11,0.012, -0.59,0.11,0.12);
 addStatic(0.01,0.4,0.235, -0.37,-0.4,0.365);         // shaft walls
@@ -448,7 +451,8 @@ function makeBear(c){
   });
   g.add(part(sphGeo(.036),cr,0,.14,.068,1.1,.85,.8));
   g.add(part(sphGeo(.011),bk,0,.152,.1));
-  return {g, spheres:[[0,0,0,.105],[0,.16,0,.085]], mass:.26, grip:1};
+  // body, head, ears, arms, feet all get collision so nothing pokes through the glass
+  return {g, spheres:[[0,0,0,.105],[0,.16,0,.085],[-.062,.228,-.005,.03],[.062,.228,-.005,.03],[-.095,.03,.03,.04],[.095,.03,.03,.04],[-.055,-.085,.045,.042],[.055,-.085,.045,.042]], mass:.26, grip:1};
 }
 function makeBunny(c){
   const g=new THREE.Group(), m=plush(c), pk=plush(PINK), bk=plush(DARK), w=plush(0xffffff);
@@ -463,7 +467,7 @@ function makeBunny(c){
   });
   g.add(part(sphGeo(.01),pk,0,.14,.08));
   g.add(part(sphGeo(.032),w,0,-.03,-.1));
-  return {g, spheres:[[0,0,0,.1],[0,.145,0,.08]], mass:.22, grip:1};
+  return {g, spheres:[[0,0,0,.1],[0,.145,0,.08],[-.036,.24,-.01,.028],[.036,.24,-.01,.028],[-.042,.3,-.01,.024],[.042,.3,-.01,.024],[-.05,-.088,.05,.035],[.05,-.088,.05,.035],[0,-.03,-.1,.03]], mass:.22, grip:1};
 }
 const beakGeo=new THREE.ConeGeometry(.022,.045,12);
 function makeChick(c){
@@ -478,7 +482,7 @@ function makeChick(c){
   });
   const t1=part(sphGeo(.02),m,0,.108,0,.6,1.4,.6); t1.rotation.z=.4; g.add(t1);
   const t2=part(sphGeo(.02),m,.01,.106,0,.6,1.2,.6); t2.rotation.z=-.3; g.add(t2);
-  return {g, spheres:[[0,0,0,.1]], mass:.15, grip:.85};
+  return {g, spheres:[[0,0,0,.1],[0,.01,.105,.025],[0,.108,0,.025]], mass:.15, grip:.85};
 }
 const eggGeo={
   bot:new THREE.SphereGeometry(.085,24,12,0,Math.PI*2,Math.PI/2,Math.PI/2),
@@ -529,7 +533,7 @@ function spawnBatch(n, lift){
     const layer=Math.floor(i/7); layers[layer]=layers[layer]||[];
     let px=0,pz=0;
     for(let t=0;t<50;t++){
-      px=-0.7+Math.random()*1.4; pz=-0.46+Math.random()*0.92;
+      px=-0.6+Math.random()*1.2; pz=-0.4+Math.random()*0.8;
       if(px<-0.2 && pz>-0.02) continue;
       if(layers[layer].every(([a,b])=>Math.hypot(a-px,b-pz)>0.26)) break;
     }
@@ -816,6 +820,13 @@ function stepGame(h){
   S.ovx+=(-w2*S.ox-damp*S.ovx-ax)*h; S.ovz+=(-w2*S.oz-damp*S.ovz-az)*h;
   S.ox+=S.ovx*h; S.oz+=S.ovz*h;
   const lim=0.3*L; S.ox=clamp(S.ox,-lim,lim); S.oz=clamp(S.oz,-lim,lim);
+  if(S.grab){ // a carried prize bumps the glass: stop the swing there instead of pushing through
+    const r=S.grab.reach, mx=Math.max(0,0.775-r), mz=Math.max(0,0.575-r);
+    const step=0.6*h;   // ease back in rather than snapping, so the held prize isn't yanked
+    const ex=S.gx+S.ox-clamp(S.gx+S.ox,-mx,mx), ez=S.gz+S.oz-clamp(S.gz+S.oz,-mz,mz);
+    if(ex){ S.ox-=clamp(ex,-step,step); if(S.ovx*ex>0) S.ovx*=-0.2; }
+    if(ez){ S.oz-=clamp(ez,-step,step); if(S.ovz*ez>0) S.ovz*=-0.2; }
+  }
   computePoses();
 }
 
@@ -891,7 +902,10 @@ function evaluateGrab(){
   best.body.collisionFilterMask=G_STATIC|G_PRIZE;
   best.body.wakeUp();
   const rel=new THREE.Vector3(b.x,b.y,b.z).sub(S.hubP).applyQuaternion(_qi.copy(S.hubQ).invert());
-  S.grab={prize:best, lock, rel, fate, guard};
+  // how far the held prize reaches sideways from the claw axis (its offset plus its furthest part)
+  let ext=0; best.body.shapes.forEach((sh,i)=>{ ext=Math.max(ext,best.body.shapeOffsets[i].length()+sh.radius); });
+  const reach=Math.hypot(rel.x,rel.z)+ext+0.01;
+  S.grab={prize:best, lock, rel, fate, guard, reach};
   S.hadGrab=true;
   tone(240,.1,'square',.035); tone(300,.12,'square',.03,.08);
 }
@@ -949,6 +963,12 @@ function postStep(h){
   for(let i=prizes.length-1;i>=0;i--){
     const p=prizes[i], y=p.body.position.y;
     if(!isFinite(y) || y<-1.5){ if(S.grab&&S.grab.prize===p) freeGrab(0); removePrize(p); continue; }
+    // safety net: if the claw ever crushes a prize into a wall, put it back inside and kill the outward speed
+    if(y>-0.05 && !(S.grab && S.grab.prize===p)){
+      const b=p.body.position, v=p.body.velocity, LX=0.7, LZ=0.5;
+      if(b.x>LX){ b.x=LX; if(v.x>0) v.x=0; } else if(b.x<-LX){ b.x=-LX; if(v.x<0) v.x=0; }
+      if(b.z>LZ){ b.z=LZ; if(v.z>0) v.z=0; } else if(b.z<-LZ){ b.z=-LZ; if(v.z<0) v.z=0; }
+    }
     if(y<-0.3){
       if(S.phase!=='ready' || S.pt<2.5) win(p);
       else { // settled into the chute with no play in progress: put it back on the pile
