@@ -219,7 +219,7 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
     <div class="stats">
       <div class="stat"><label>代幣</label><b id="coins">10</b></div>
       <div class="stat"><label>獎品</label><b id="wins">0</b></div>
-      <div class="stat guard" id="guardBox" title="連續 5 次沒夾到，下一次保證夾起"><label>保夾</label><b id="guard">0/5</b></div>
+      <div class="stat guard" id="guardBox" title="累積 5 次沒夾到，下一次保證夾起"><label>保夾</label><b id="guard">0/5</b></div>
       <div class="stat timer" id="timerBox"><label>秒數</label><b id="timer">--</b></div>
     </div>
   </header>
@@ -231,7 +231,7 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
     <div class="easy-wrap">
       <button class="easy" id="easyBtn" type="button" aria-pressed="false" title="夾子正下方顯示瞄準線"><i class="dot" aria-hidden="true"></i>簡單模式</button>
       <div class="easy-tip" id="easyTip" role="status" hidden>
-        <b>連續 3 次沒夾到嗎？</b>打開「簡單模式」，夾子正下方會出現紅色瞄準線，更好對準！
+        <b>已經 3 次沒夾到了嗎？</b>打開「簡單模式」，夾子正下方會出現紅色瞄準線，更好對準！
         <div class="acts"><button class="yes" id="easyYes" type="button">開啟</button><button class="no" id="easyNo" type="button">不用了</button></div>
       </div>
     </div>
@@ -728,9 +728,20 @@ function updateEffects(dt){
   if(alive) confGeo.attributes.position.needsUpdate=true;
 }
 
-const laser=new THREE.Mesh(new THREE.CylinderGeometry(.003,.003,1,6),MAT.laser); scene.add(laser);
-const marker=new THREE.Mesh(new THREE.RingGeometry(.022,.034,24),new THREE.MeshBasicMaterial({color:0xff3b5c,transparent:true,opacity:.85,side:THREE.DoubleSide,depthWrite:false}));
-marker.rotation.x=-Math.PI/2; scene.add(marker);
+// aiming line: a thick solid core inside a glowing halo, ending in a big target on whatever is below.
+// Drawn on top of everything (depthTest off) so fuzzy prizes and the glass never hide it.
+const onTop=(color,opacity,extra)=>new THREE.MeshBasicMaterial(Object.assign({color,transparent:true,opacity,depthTest:false,depthWrite:false,side:THREE.DoubleSide},extra||{}));
+const laserGlowMat=onTop(0xff4a6a,.35,{blending:THREE.AdditiveBlending});
+const laser=new THREE.Group(); scene.add(laser);
+[[.0045,.012,0xffffff,1],[.009,0,0xff1f47,1]].forEach(([r,dr,c,o],i)=>{   // white edge + red core
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r+dr,r+dr,1,10),i?MAT.laser:onTop(c,o)); m.renderOrder=20+i; laser.add(m);
+});
+MAT.laser.depthTest=false; MAT.laser.opacity=1; MAT.laser.color.set(0xff1f47);
+{ const g=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,1,14),laserGlowMat); g.renderOrder=19; laser.add(g); }
+const marker=new THREE.Group(); scene.add(marker);
+[[.075,.1,0xffffff,.95],[.083,.097,0xff1f47,1],[.033,.05,0xffffff,.95],[0,.03,0xff1f47,1]].forEach(([a,b,c,o],i)=>{
+  const m=new THREE.Mesh(a?new THREE.RingGeometry(a,b,40):new THREE.CircleGeometry(b,28),onTop(c,o)); m.rotation.x=-Math.PI/2; m.renderOrder=22+i; marker.add(m);
+});
 
 /* ================= game state ================= */
 const S={
@@ -1006,6 +1017,7 @@ function freeGrab(delay){
   g.prize.body.type=CANNON.Body.DYNAMIC; g.prize.body.allowSleep=true;
   g.prize.body.wakeUp();
   S.pendingMask.push({p:g.prize,t:delay});
+  S.dropped=g.prize; S.dropT=3;
   S.grab=null;
 }
 function dropGrab(announce){
@@ -1065,9 +1077,23 @@ function postStep(h){
     const m=S.pendingMask[i]; m.t-=h;
     if(m.t<=0){ m.p.body.collisionFilterMask=MASK_FULL; S.pendingMask.splice(i,1); }
   }
+  S.dropT=Math.max(0,(S.dropT||0)-h);
   for(let i=prizes.length-1;i>=0;i--){
     const p=prizes[i], y=p.body.position.y;
     if(!isFinite(y) || y<-1.5){ if(S.grab&&S.grab.prize===p) freeGrab(0); removePrize(p); continue; }
+    // chute funnel: the hole must never hold a prize. A long one (a bunny is ~45cm ear to foot) could lie
+    // bridged between the barrier and the cabinet wall, or one just let go could catch the barrier's top
+    // edge and tumble back out. Once it's over the hole it stops touching the walls and drops straight in.
+    if(!(S.grab && S.grab.prize===p) && y<0.55){
+      const b=p.body.position, v=p.body.velocity;
+      const over=b.x<-0.37 && b.z>0.12;
+      const edge=!over && p===S.dropped && S.dropT>0 && b.x<-0.28 && b.z>0.04;   // just released, landing on the rim
+      if(over || edge){
+        p.body.collisionFilterMask=G_CLAW; p.body.wakeUp();
+        if(edge){ v.x=(CHUTE.x-b.x)*7; v.z=(CHUTE.z-b.z)*7; }   // steer it over the hole before it sinks below the floor
+        else { v.x*=0.9; v.z*=0.9; }
+      }
+    }
     // safety net: if the claw ever crushes a prize into a wall, put it back inside and kill the outward speed
     if(y>-0.05 && !(S.grab && S.grab.prize===p)){
       const b=p.body.position, v=p.body.velocity, LX=0.7, LZ=0.5;
@@ -1080,6 +1106,7 @@ function postStep(h){
       if(S.phase!=='ready' || S.pt<2.5) win(p);
       else { // settled into the chute with no play in progress: put it back on the pile
         p.body.position.set(0.25,0.9,0); p.body.velocity.set(0,0,0); p.body.angularVelocity.set(0,0,0); p.body.wakeUp();
+        p.body.collisionFilterMask=MASK_FULL;
       }
     }
   }
@@ -1089,7 +1116,8 @@ function win(p){
   if(S.grab && S.grab.prize===p) freeGrab(0);
   removePrize(p);
   const wasGuard=guaranteed();
-  S.wins++; S.turnWin=true; S.msgShown=true; S.miss=0;
+  // the 保夾 count only resets once the guaranteed grab is used; ordinary wins along the way keep it
+  S.wins++; S.turnWin=true; S.msgShown=true; if(wasGuard) S.miss=0;
   burstConfetti(wasGuard?260:140);
   S.collection.push({label:p.label,color:p.color});
   S.counts[p.label]=(S.counts[p.label]||0)+1;
@@ -1470,7 +1498,8 @@ function syncVisuals(dt){
     const y0=S.hubP.y-0.05, l=Math.max(0.01,y0-sy);
     laser.position.set(S.hubP.x,sy+l/2,S.hubP.z); laser.scale.y=l;
     marker.position.set(S.hubP.x,sy+0.004,S.hubP.z);
-    MAT.laser.opacity=0.45+0.3*Math.sin(clock*6);
+    marker.scale.setScalar(1+0.18*Math.sin(clock*6));
+    laserGlowMat.opacity=0.28+0.18*Math.sin(clock*6);
   }
   // coin insert: arcs toward the slot while flipping, turns edge-on, slides in
   const ct=S.phase==='coin'?S.pt:99;
