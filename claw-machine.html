@@ -100,6 +100,16 @@ button:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
 .ach span{display:block;font-size:11px;color:var(--cream-dim);margin-top:2px}
 .ach.locked .medal{filter:grayscale(1) brightness(.45);border-color:rgba(255,244,224,.25);box-shadow:none}
 .ach.locked b{color:var(--cream-dim)}
+.sheet-body.clear{text-align:center;padding:22px 18px 20px}
+.clear small{display:block;font:400 11px/1 var(--display);letter-spacing:.24em;color:var(--gold)}
+.clear h2{margin:10px 0 14px;font-size:30px;font-weight:900;text-shadow:0 3px 0 var(--tangerine-deep)}
+.cstats{display:flex;gap:8px;justify-content:center}
+.cstats div{flex:1;background:rgba(255,244,224,.07);border-radius:14px;padding:10px 4px}
+.cstats b{display:block;font:400 26px/1.1 var(--display);color:var(--mint)}
+.cstats span{font-size:12px;color:var(--cream-dim)}
+.clear p{margin:12px 0 0;font-size:14px;font-weight:700}
+.clear p.dim{font-size:12px;color:var(--cream-dim);font-weight:500}
+.pill.big{margin-top:16px;padding:14px 28px;font-size:16px;background:var(--tangerine);color:var(--cream);box-shadow:0 4px 0 var(--tangerine-deep)}
 .cat h3 em{font-style:normal;color:var(--cream-dim);margin-left:6px;letter-spacing:.04em}
 .cat h3 .done{color:var(--gold)}
 
@@ -272,6 +282,19 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
       <div class="sheet-body">
         <div class="row"><label for="optSound">音效</label><input class="switch" type="checkbox" id="optSound" checked></div>
         <div class="row"><label>補貨<small>機台內最多 24 隻娃娃</small></label><button class="pill" type="button" id="restock">補 8 隻</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="backdrop viewer" id="clearPanel" hidden>
+    <div class="sheet small" role="dialog" aria-modal="true" aria-labelledby="clearTitle">
+      <div class="sheet-body clear">
+        <small>ROUND CLEAR</small>
+        <h2 id="clearTitle">清台成功！</h2>
+        <div class="cstats" id="clearStats"></div>
+        <p id="clearNew"></p>
+        <p class="dim" id="clearProg"></p>
+        <button class="pill big" type="button" id="clearAgain">再來一輪</button>
       </div>
     </div>
   </div>
@@ -559,8 +582,8 @@ const TYPES=[
 ];
 const prizes=[];
 function pickType(){ const tot=TYPES.reduce((a,t)=>a+t.w,0); let r=Math.random()*tot; for(const t of TYPES){ if((r-=t.w)<0) return t; } return TYPES[0]; }
-function createPrize(type,x,y,z){
-  const col=type.colors[Math.floor(Math.random()*type.colors.length)];
+function createPrize(type,x,y,z,colIdx){
+  const col=type.colors[colIdx!=null?colIdx:Math.floor(Math.random()*type.colors.length)];
   const spec=type.make(col[0]);
   let cx=0,cy=0,cz=0,tw=0;
   spec.spheres.forEach(([a,b,c,r])=>{const w=r*r*r; cx+=a*w; cy+=b*w; cz+=c*w; tw+=w;});
@@ -575,8 +598,19 @@ function createPrize(type,x,y,z){
   const p={body, mesh:outer, label:col[1]+type.kind, color:col[0], grip:spec.grip};
   prizes.push(p); return p;
 }
+// Which variants to put in: first the ones the player still lacks and that aren't in the machine
+// (so a series can always be completed), then the usual random mix.
+function pickVariants(n){
+  const present=new Set(prizes.map(p=>p.label));
+  const need=[];
+  TYPES.forEach(t=>t.colors.forEach(([,nm],ci)=>{ const l=nm+t.kind; if(!S.counts[l] && !present.has(l)) need.push([t,ci]); }));
+  for(let i=need.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [need[i],need[j]]=[need[j],need[i]]; }
+  const out=need.slice(0,n);
+  while(out.length<n){ const t=pickType(); out.push([t,Math.floor(Math.random()*t.colors.length)]); }
+  return out;
+}
 function spawnBatch(n, lift){
-  const layers=[];
+  const layers=[], picks=pickVariants(n);
   for(let i=0;i<n;i++){
     const layer=Math.floor(i/7); layers[layer]=layers[layer]||[];
     let px=0,pz=0;
@@ -586,7 +620,7 @@ function spawnBatch(n, lift){
       if(layers[layer].every(([a,b])=>Math.hypot(a-px,b-pz)>0.26)) break;
     }
     layers[layer].push([px,pz]);
-    createPrize(pickType(), px, 0.18+layer*0.3+(lift||0), pz);
+    createPrize(picks[i][0], px, 0.18+layer*0.3+(lift||0), pz, picks[i][1]);
   }
 }
 function removePrize(p){
@@ -751,7 +785,7 @@ const S={
   carryD0:1, liftStart:TOP_Y, collection:[], pendingMask:[],
   hubP:new THREE.Vector3(), hubQ:new THREE.Quaternion(), pP:PHI.map(()=>new THREE.Vector3()), pQ:PHI.map(()=>new THREE.Quaternion()),
 };
-S.counts={}; S.laserOn=false; S.miss=0; S.ach=[];
+S.counts={}; S.laserOn=false; S.miss=0; S.ach=[]; S.round={plays:0,wins:0,fresh:[]};
 try{
   const saved=JSON.parse(localStorage.getItem('clawMachineV1')||'null');
   if(saved && Array.isArray(saved.collection)){
@@ -1056,7 +1090,30 @@ function endTurn(){
     else if(!S.msgShown) toast(S.hadGrab?'差一點點！':'沒夾到，再試一次',true);
   }
   setPhase('ready');
+  if(!prizes.length) setTimeout(showClear, achBusy?4200:1600);   // cleared the machine: settle the round
+  else topUpMissing();
 }
+// keep every variant the player still needs in the machine, so no achievement can become impossible
+function topUpMissing(){
+  const room=24-prizes.length; if(room<=0) return;
+  const present=new Set(prizes.map(p=>p.label)); let miss=0;
+  TYPES.forEach(t=>t.colors.forEach(([,nm])=>{ const l=nm+t.kind; if(!S.counts[l] && !present.has(l)) miss++; }));
+  if(!miss) return;
+  spawnBatch(Math.min(miss,room),0.9);
+  setTimeout(()=>{ if(S.phase==='ready' && !achBusy && $('clearPanel').hidden) toast('新款娃娃上架了',true); },700);
+}
+function showClear(){
+  if(prizes.length || !$('clearPanel').hidden) return;
+  const r=S.round, all=TYPES.reduce((a,t)=>a+t.colors.length,0);
+  let have=0; TYPES.forEach(t=>t.colors.forEach(([,nm])=>{ if(S.counts[nm+t.kind]) have++; }));
+  $('clearStats').innerHTML=`<div><b>${r.wins}</b><span>本輪抓到</span></div><div><b>${r.plays}</b><span>用了代幣</span></div><div><b>${r.fresh.length}</b><span>新款</span></div>`;
+  $('clearNew').textContent=r.fresh.length?'新收集：'+r.fresh.join('、'):'';
+  $('clearProg').textContent=`圖鑑 ${have} / ${all} 款 · 成就 ${S.ach.length} / ${ACHS.length}`;
+  for(const k in keys) keys[k]=false;
+  $('clearPanel').hidden=false; $('clearAgain').focus();
+  burstConfetti(220); [523,659,784,1047,1319].forEach((f,i)=>tone(f,.16,'square',.04,i*.09));
+}
+
 function guaranteed(){ return S.miss>=PITY; }
 let bannerTimer=0;
 function showGuardBanner(sub){
@@ -1120,6 +1177,8 @@ function win(p){
   S.wins++; S.turnWin=true; S.msgShown=true; if(wasGuard) S.miss=0;
   burstConfetti(wasGuard?260:140);
   S.collection.push({label:p.label,color:p.color});
+  if(!S.counts[p.label]) S.round.fresh.push(p.label);
+  S.round.wins++;
   S.counts[p.label]=(S.counts[p.label]||0)+1;
   const got=newAchievements();
   save(); renderTray(true);
@@ -1194,9 +1253,10 @@ function updateHUD(){
 
 function pressGrab(){
   ensureAudio();
+  if(!$('clearPanel').hidden) return;
   if(S.phase==='ready'){
     if(S.coins<=0){ S.coins=10; toast('補充了 10 枚代幣',true); tone(988,.08,'square',.035); updateButton(); return; }
-    S.coins--; S.turnWin=false; S.hadGrab=false; S.msgShown=false;
+    S.coins--; S.round.plays++; S.turnWin=false; S.hadGrab=false; S.msgShown=false;
     hideEasyNudge(false);
     setPhase('coin');
     if(guaranteed()){ showGuardBanner('這次一定夾得到'); fx.guardBurst=2; guardFanfare(); }
@@ -1248,6 +1308,7 @@ stick.addEventListener('pointerup',stickEnd); stick.addEventListener('pointercan
 
 const KEYMAP={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',a:'left',d:'right',w:'up',s:'down',A:'left',D:'right',W:'up',S:'down'};
 window.addEventListener('keydown',e=>{
+  if(!$('clearPanel').hidden){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('clearAgain').click(); } return; }
   if(V.open){ if(e.key==='Escape') closeViewer(); return; }
   if(openPanel){ if(e.key==='Escape') closePanel(); return; }
   if(KEYMAP[e.key]){ keys[KEYMAP[e.key]]=true; e.preventDefault(); ensureAudio(); }
@@ -1450,6 +1511,10 @@ $('viewerPanel').addEventListener('pointerdown',e=>{ if(e.target===e.currentTarg
 $('viewerSpin').addEventListener('click',e=>{ V.spin=!V.spin; e.currentTarget.setAttribute('aria-pressed',String(V.spin)); });
 $('viewerReset').addEventListener('click',()=>{ V.yaw=-0.5; V.pitch=0.22; V.zoom=1; V.vel=0; });
 
+$('clearAgain').addEventListener('click',()=>{
+  $('clearPanel').hidden=true; S.round={plays:0,wins:0,fresh:[]};
+  spawnBatch(18,0.9); toast('補貨完成，新一輪開始！',true); tone(660,.1,'square',.03); tone(880,.14,'square',.03,.1);
+});
 $('restock').addEventListener('click',e=>{
   closePanel();
   if(prizes.length>=24){ toast('機台已經滿了',true); return; }
