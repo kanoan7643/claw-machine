@@ -281,7 +281,6 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
       </div>
       <div class="sheet-body">
         <div class="row"><label for="optSound">音效</label><input class="switch" type="checkbox" id="optSound" checked></div>
-        <div class="row"><label>補貨<small>機台內最多 24 隻娃娃</small></label><button class="pill" type="button" id="restock">補 8 隻</button></div>
       </div>
     </div>
   </div>
@@ -335,6 +334,7 @@ const PHI = [0, 2*Math.PI/3, 4*Math.PI/3];
 const SAMPLES = [[0,-0.1,0],[0,-0.17,0],[0,-0.24,0],[-0.03,-0.253,0],[-0.0595,-0.266,0]];
 const G_STATIC=1, G_PRIZE=2, G_CLAW=4, MASK_FULL=G_STATIC|G_PRIZE|G_CLAW;
 const PLAY_TIME = 20;
+const FULL = 24;                       // prizes in a full machine
 const PITY = 5;                        // plays without a win before 保夾 kicks in
 const COIN_HIT = 0.6, COIN_T = 0.85;   // coin reaches the slot / disappears inside
 const SLOT = {x:0.42, y:-0.42, z:0.72};
@@ -600,17 +600,17 @@ function createPrize(type,x,y,z,colIdx){
 }
 // Which variants to put in: first the ones the player still lacks and that aren't in the machine
 // (so a series can always be completed), then the usual random mix.
-function pickVariants(n){
+function pickVariants(n,everything){
   const present=new Set(prizes.map(p=>p.label));
   const need=[];
-  TYPES.forEach(t=>t.colors.forEach(([,nm],ci)=>{ const l=nm+t.kind; if(!S.counts[l] && !present.has(l)) need.push([t,ci]); }));
+  TYPES.forEach(t=>t.colors.forEach(([,nm],ci)=>{ const l=nm+t.kind; if(everything ? !present.has(l) : (!S.counts[l] && !present.has(l))) need.push([t,ci]); }));
   for(let i=need.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [need[i],need[j]]=[need[j],need[i]]; }
   const out=need.slice(0,n);
   while(out.length<n){ const t=pickType(); out.push([t,Math.floor(Math.random()*t.colors.length)]); }
   return out;
 }
-function spawnBatch(n, lift){
-  const layers=[], picks=pickVariants(n);
+function spawnBatch(n, lift, everything){
+  const layers=[], picks=pickVariants(n,everything);
   for(let i=0;i<n;i++){
     const layer=Math.floor(i/7); layers[layer]=layers[layer]||[];
     let px=0,pz=0;
@@ -1513,13 +1513,7 @@ $('viewerReset').addEventListener('click',()=>{ V.yaw=-0.5; V.pitch=0.22; V.zoom
 
 $('clearAgain').addEventListener('click',()=>{
   $('clearPanel').hidden=true; S.round={plays:0,wins:0,fresh:[]};
-  spawnBatch(18,0.9); toast('補貨完成，新一輪開始！',true); tone(660,.1,'square',.03); tone(880,.14,'square',.03,.1);
-});
-$('restock').addEventListener('click',e=>{
-  closePanel();
-  if(prizes.length>=24){ toast('機台已經滿了',true); return; }
-  spawnBatch(Math.min(8,24-prizes.length),0.9);
-  toast('補貨完成',true); tone(660,.1,'square',.03); tone(880,.14,'square',.03,.1);
+  spawnBatch(FULL,0.6,true); toast('機台重新裝滿，新一輪開始！',true); tone(660,.1,'square',.03); tone(880,.14,'square',.03,.1);
 });
 
 /* ================= render loop ================= */
@@ -1611,8 +1605,8 @@ function frame(now){
 /* ================= boot ================= */
 resize();
 computePoses(); snapKin();
-spawnBatch(18,0);
-for(let i=0;i<360;i++){ driveAll(); world.step(H); }
+spawnBatch(FULL,0,true);   // a full machine with every variant in it, so nothing ever needs restocking
+for(let i=0;i<720;i++){ driveAll(); world.step(H); }
 S.pt=99; // not inside a turn's grace window
 renderTray(); updateButton(); updateHUD();
 $('boot').hidden=true;
