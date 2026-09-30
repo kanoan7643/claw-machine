@@ -81,7 +81,12 @@ button:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
 .easy-tip .no{background:rgba(21,24,50,.1);color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.tools .easy.nudge{animation:none;box-shadow:0 0 0 4px rgba(255,214,107,.6)}}
 
-.ach-banner{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:4;padding:16px}
+.ach-banner{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:9;padding:16px}
+#collectPanel.over{z-index:7}
+#viewerPanel{z-index:8}
+button.ach{border:0;color:inherit;font:inherit;width:100%;cursor:pointer;transition:transform .15s,background .15s}
+button.ach:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
+.clear .pill.ghost{background:rgba(255,244,224,.12);color:var(--cream);box-shadow:none;margin:10px 0 0;display:block;margin-left:auto;margin-right:auto}
 .ach-card{position:relative;text-align:center;background:linear-gradient(160deg,#2e3874,var(--ink));border:3px solid var(--gold);border-radius:24px;padding:20px 28px 22px;min-width:min(280px,100%);box-shadow:0 0 0 6px rgba(255,214,107,.2),0 0 60px rgba(255,190,60,.55),0 20px 50px rgba(0,0,0,.5);animation:achIn 3.4s cubic-bezier(.2,1.5,.4,1) forwards}
 @keyframes achIn{0%{transform:scale(.4) translateY(40px);opacity:0}10%{transform:scale(1);opacity:1}86%{transform:scale(1);opacity:1}100%{transform:scale(.9) translateY(-20px);opacity:0}}
 .ach-card small{display:block;font:400 11px/1 var(--display);letter-spacing:.24em;color:var(--gold)}
@@ -294,6 +299,7 @@ button.card:hover{transform:translateY(-3px);background:rgba(255,244,224,.12)}
         <p id="clearNew"></p>
         <p class="dim" id="clearProg"></p>
         <button class="pill big" type="button" id="clearAgain">再來一輪</button>
+        <button class="pill ghost" type="button" id="clearBag">查看背包與成就</button>
       </div>
     </div>
   </div>
@@ -1195,16 +1201,21 @@ function medalHTML(a){
   const [hex]=a.type.colors[0];
   return `<img alt="" src="${thumbnail(a.type,hex)}">`;
 }
+let achHide=0;
+function showAchCard(a){
+  $('achMedal').innerHTML=medalHTML(a); $('achName').textContent=a.name; $('achDesc').textContent=a.desc;
+  const b=$('achBanner'); b.hidden=true; void b.offsetWidth; b.hidden=false;
+  [659,784,1047,1319].forEach((f,i)=>tone(f,.18,'square',.035,i*.11));
+  tone(1568,.6,'triangle',.035,.46); tone(1047,.6,'triangle',.03,.46);
+  clearTimeout(achHide); achHide=setTimeout(()=>{ b.hidden=true; },3400);
+}
 function nextAchievement(){
   const a=achQueue.shift();
   if(!a){ achBusy=false; return; }
-  $('achMedal').innerHTML=medalHTML(a); $('achName').textContent=a.name; $('achDesc').textContent=a.desc;
-  const b=$('achBanner'); b.hidden=true; void b.offsetWidth; b.hidden=false;
+  showAchCard(a);
   burstConfetti(a.id==='all'?300:200); flashT=3;
-  [659,784,1047,1319].forEach((f,i)=>tone(f,.18,'square',.035,i*.11));
-  tone(1568,.6,'triangle',.035,.46); tone(1047,.6,'triangle',.03,.46);
   renderTray(true);
-  setTimeout(()=>{ b.hidden=true; setTimeout(nextAchievement,250); },3400);
+  setTimeout(nextAchievement,3650);
 }
 
 /* ----- fixed-step loop ----- */
@@ -1308,9 +1319,9 @@ stick.addEventListener('pointerup',stickEnd); stick.addEventListener('pointercan
 
 const KEYMAP={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',a:'left',d:'right',w:'up',s:'down',A:'left',D:'right',W:'up',S:'down'};
 window.addEventListener('keydown',e=>{
-  if(!$('clearPanel').hidden){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('clearAgain').click(); } return; }
   if(V.open){ if(e.key==='Escape') closeViewer(); return; }
   if(openPanel){ if(e.key==='Escape') closePanel(); return; }
+  if(!$('clearPanel').hidden){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('clearAgain').click(); } return; }
   if(KEYMAP[e.key]){ keys[KEYMAP[e.key]]=true; e.preventDefault(); ensureAudio(); }
   else if(e.key===' '||e.code==='Space'){ e.preventDefault(); if(!e.repeat) pressGrab(); }
 });
@@ -1337,7 +1348,7 @@ $('viewSide').addEventListener('click',e=>{ cam.targetAz=1.25; cam.el=0.22; sync
 /* ----- settings & collection panels ----- */
 let openPanel=null;
 function showPanel(id){ closePanel(); openPanel=$(id); openPanel.hidden=false; for(const k in keys) keys[k]=false; const c=openPanel.querySelector('[data-close]'); if(c) c.focus(); }
-function closePanel(){ if(openPanel){ openPanel.hidden=true; openPanel=null; } }
+function closePanel(){ if(openPanel){ openPanel.hidden=true; openPanel.classList.remove('over'); openPanel=null; } }
 document.querySelectorAll('.backdrop:not(.viewer)').forEach(b=>{
   b.addEventListener('pointerdown',e=>{ if(e.target===b) closePanel(); });
   b.querySelector('[data-close]').addEventListener('click',closePanel);
@@ -1395,11 +1406,12 @@ function renderCollection(){
   const as=document.createElement('section'), ah=document.createElement('h3'), ag=document.createElement('div');
   ah.textContent='成就'; ag.className='achs';
   ACHS.forEach(a=>{
-    const on=S.ach.includes(a.id), el=document.createElement('div');
+    const on=S.ach.includes(a.id), el=document.createElement(on?'button':'div');
     el.className='ach'+(on?'':' locked');
+    if(on){ el.type='button'; el.setAttribute('aria-label','重播成就 '+a.name); el.addEventListener('click',()=>showAchCard(a)); }
     el.innerHTML=`<div class="medal">${medalHTML(a)}</div><b></b><span class="desc"></span>`;
     el.querySelector('b').textContent=a.name;
-    el.querySelector('.desc').textContent=on?'已達成':a.desc;
+    el.querySelector('.desc').textContent=on?'已達成 · 點我重播':a.desc;
     ag.appendChild(el);
   });
   as.appendChild(ah); as.appendChild(ag); list.appendChild(as);
@@ -1511,6 +1523,7 @@ $('viewerPanel').addEventListener('pointerdown',e=>{ if(e.target===e.currentTarg
 $('viewerSpin').addEventListener('click',e=>{ V.spin=!V.spin; e.currentTarget.setAttribute('aria-pressed',String(V.spin)); });
 $('viewerReset').addEventListener('click',()=>{ V.yaw=-0.5; V.pitch=0.22; V.zoom=1; V.vel=0; });
 
+$('clearBag').addEventListener('click',()=>{ renderCollection(); showPanel('collectPanel'); $('collectPanel').classList.add('over'); });
 $('clearAgain').addEventListener('click',()=>{
   $('clearPanel').hidden=true; S.round={plays:0,wins:0,fresh:[]};
   spawnBatch(FULL,0.6,true); toast('機台重新裝滿，新一輪開始！',true); tone(660,.1,'square',.03); tone(880,.14,'square',.03,.1);
